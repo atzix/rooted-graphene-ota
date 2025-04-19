@@ -1,25 +1,14 @@
 name: Release single device
 
 on:
-  # Note that push/PR will not release, only build to see if there are obvious failures
-  push:
-    branches:
-      - '*'
-    paths:
-      - rooted-ota.sh
-  pull_request:
-    types: [synchronize, opened, reopened]
-    paths:
-      - rooted-ota.sh
-
   workflow_call:
     inputs:
       device-id:
         type: string
       magisk-preinit-device:
         type: string
-        default: ''
-  
+        default: 'sda10'
+
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
     inputs:
@@ -31,10 +20,6 @@ on:
         required: false
       skip-rootless:
         description: skip building rootless OTA
-        type: boolean
-        required: false
-      skip-rooted:
-        description: skip building rooted OTA
         type: boolean
         required: false
       upload-test-ota:
@@ -53,16 +38,19 @@ on:
         description: Skip release (build only)
         required: false
         type: boolean
+      rooted-graphene-version:
+        description: Git ref of rooted graphene repo to use
+        required: false
       ota-version:
         description: OTA version
         required: false
-      magisk-version:
-        description: Magisk version
-        required: false
+      additional-env:
+        description: Additional env var key value pairs, space separated, e.g. "A=1 B=2"
+        default: ''
 jobs:
   build-device:
     runs-on: ubuntu-latest
-    timeout-minutes: 20 # Make sure to not waste hours when some command does not return 
+    timeout-minutes: 20 # Make sure to not waste hours when some command does not return
     steps:
       - uses: actions/checkout@v5
         with:
@@ -73,11 +61,7 @@ jobs:
         # Note the difference between github.event.inputs (workflow_dispatch) and inputs (workflow_call)
         run: |
           echo "DEVICE_ID=$(echo '${{ github.event.inputs.device-id || inputs.device-id || 'shiba' }}' | xargs)" >> $GITHUB_ENV
-          if [[ "${{ github.event.inputs.skip-rooted }}" != "true" ]]; then
-            echo "MAGISK_PREINIT_DEVICE=$(echo '${{ github.event.inputs.magisk-preinit-device || inputs.magisk-preinit-device || 'sda10' }}' | xargs)" >> $GITHUB_ENV
-          fi
-          
-          echo "MAGISK_VERSION=$(echo '${{ github.event.inputs.magisk-version || '' }}' | xargs)" >> $GITHUB_ENV
+          echo "MAGISK_PREINIT_DEVICE=$(echo '${{ github.event.inputs.magisk-preinit-device || inputs.magisk-preinit-device || '' }}' | xargs)" >> $GITHUB_ENV
           echo "OTA_VERSION=$(echo '${{ github.event.inputs.ota-version || '' }}' | xargs)" >> $GITHUB_ENV
           echo "FORCE_OTA_SERVER_UPLOAD=$(echo '${{ github.event.inputs.force-ota-server-upload || '' }}' | xargs)" >> $GITHUB_ENV
           echo "FORCE_BUILD=$(echo '${{ github.event.inputs.force-build || '' }}' | xargs)" >> $GITHUB_ENV
@@ -93,6 +77,12 @@ jobs:
           else
             echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
           fi
+          
+          # Split additional-env and set each key-value pair as an environment variable
+          IFS=' ' read -r -a env_vars <<< '${{ github.event.inputs.additional-env || '' }}'
+          for key_value_pair in "${env_vars[@]}"; do
+            echo "$key_value_pair" >> $GITHUB_ENV
+          done
       - run: sudo apt-get install -y jq curl git
       - name: release
         env:
