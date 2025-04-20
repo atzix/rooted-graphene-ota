@@ -33,10 +33,9 @@ OTA_VERSION=${OTA_VERSION:-'latest'}
 
 # It's recommended to pin magisk version in combination with AVB_ROOT_VERSION.
 # Breaking changes in magisk might need to be adapted in new avbroot version
-# Find latest magisk version here: https://github.com/topjohnwu/Magisk/releases, or:
-# curl --fail -sL -I -o /dev/null -w '%{url_effective}' https://github.com/topjohnwu/Magisk/releases/latest | sed 's/.*\/tag\///;'
-# renovate: datasource=github-releases packageName=topjohnwu/Magisk versioning=semver-coerced
-DEFAULT_MAGISK_VERSION=v29.0
+# Find latest magisk version here: https://github.com/pixincreate/Magisk/releases
+# renovate: datasource=github-releases packageName=pixincreate/Magisk
+DEFAULT_MAGISK_VERSION=canary-28103
 MAGISK_VERSION=${MAGISK_VERSION:-${DEFAULT_MAGISK_VERSION}}
 
 SKIP_CLEANUP=${SKIP_CLEANUP:-''}
@@ -67,15 +66,15 @@ NO_COLOR=${NO_COLOR:-''}
 OTA_BASE_URL="https://releases.grapheneos.org"
 
 # renovate: datasource=github-releases packageName=chenxiaolong/avbroot versioning=semver
-AVB_ROOT_VERSION=3.22.0
+AVB_ROOT_VERSION=3.15.0
 # renovate: datasource=github-releases packageName=chenxiaolong/Custota versioning=semver-coerced
-CUSTOTA_VERSION=5.15
+CUSTOTA_VERSION=5.7
 # renovate: datasource=git-refs packageName=https://github.com/chenxiaolong/my-avbroot-setup currentValue=master
 PATCH_PY_COMMIT=16636c3
 # renovate: datasource=docker packageName=python
-PYTHON_VERSION=3.13.7-alpine
+PYTHON_VERSION=3.13.3-alpine
 # renovate: datasource=github-releases packageName=chenxiaolong/OEMUnlockOnBoot versioning=semver-coerced
-OEMUNLOCKONBOOT_VERSION=1.2
+OEMUNLOCKONBOOT_VERSION=1.1
 # renovate: datasource=github-releases packageName=chenxiaolong/afsr versioning=semver
 AFSR_VERSION=1.0.3
 
@@ -140,14 +139,14 @@ function checkBuildNecessary() {
   local currentCommit
   currentCommit=$(git rev-parse --short HEAD)
   POTENTIAL_ASSETS=()
-    
-  if [[ -n "$MAGISK_PREINIT_DEVICE" ]]; then 
+
+  if [[ -n "$MAGISK_PREINIT_DEVICE" ]]; then
     # e.g. oriole-2023121200-magisk-v26.4-4647f74-dirty.zip
     POTENTIAL_ASSETS['magisk']="${DEVICE_ID}-${OTA_VERSION}-${currentCommit}-magisk-${MAGISK_VERSION}$(createAssetSuffix).zip"
-  else 
+  else
     printGreen "MAGISK_PREINIT_DEVICE not set for device, not creating magisk OTA"
   fi
-  
+
   if [[ "$SKIP_ROOTLESS" != 'true' ]]; then
     POTENTIAL_ASSETS['rootless']="${DEVICE_ID}-${OTA_VERSION}-${currentCommit}-rootless$(createAssetSuffix).zip"
   else
@@ -177,16 +176,16 @@ function checkBuildNecessary() {
   if [[ -n ${response} ]]; then
     RELEASE_ID=$(echo "${response}" | jq -r '.id')
     print "Release ${OTA_VERSION} exists. ID=$RELEASE_ID"
-    
+
     for flavor in "${!POTENTIAL_ASSETS[@]}"; do
       local selectedAsset POTENTIAL_ASSET_NAME="${POTENTIAL_ASSETS[$flavor]}"
       print "Checking if asset exists ${POTENTIAL_ASSET_NAME}"
-      
+
       # Save some storage by not building and uploading every new commit as asset
       selectedAsset=$(echo "${response}" | jq -r --arg assetPrefix "${DEVICE_ID}-${OTA_VERSION}" \
         '.assets[] | select(.name | startswith($assetPrefix)) | .name' \
           | grep "${flavor}" || true)
-  
+
       if [[ -n "${selectedAsset}" ]] && [[ "$FORCE_BUILD" != 'true' ]] && [[ "$UPLOAD_TEST_OTA" != 'true' ]]; then
         printGreen "Skipping build of asset name '$POTENTIAL_ASSET_NAME'. Because this flavor already is released with a different commit." \
           "Set FORCE_BUILD or UPLOAD_TEST_OTA to force. Assets found on release: ${selectedAsset//$'\n'/ }"
@@ -195,7 +194,7 @@ function checkBuildNecessary() {
         print "No asset found with name '$POTENTIAL_ASSET_NAME'."
       fi
     done
-    
+
     if [ "${#POTENTIAL_ASSETS[@]}" -eq 0 ]; then
       printGreen "All potential assets already exist. Exiting"
       exit 0
@@ -220,7 +219,7 @@ function createAssetSuffix() {
   local suffix=''
   if [[ "${SKIP_MODULES}" == 'true' ]]; then
     suffix+='-minimal'
-  fi 
+  fi
   if [[ "${UPLOAD_TEST_OTA}" == 'true' ]]; then
     suffix+='-test'
   fi
@@ -235,7 +234,7 @@ function downloadAndroidDependencies() {
 
   mkdir -p .tmp
   if ! ls ".tmp/magisk-$MAGISK_VERSION.apk" >/dev/null 2>&1 && [[ "${POTENTIAL_ASSETS['magisk']+isset}" ]]; then
-    curl --fail -sLo ".tmp/magisk-$MAGISK_VERSION.apk" "https://github.com/topjohnwu/Magisk/releases/download/$MAGISK_VERSION/Magisk-$MAGISK_VERSION.apk"
+    curl --fail -sLo ".tmp/magisk-$MAGISK_VERSION.apk" "https://github.com/pixincreate/Magisk/releases/download/$MAGISK_VERSION/app-release.apk"
   fi
 
   if ! ls ".tmp/$OTA_TARGET.zip" >/dev/null 2>&1; then
@@ -247,7 +246,7 @@ function findLatestVersion() {
   checkMandatoryVariable DEVICE_ID
 
   if [[ "$MAGISK_VERSION" == 'latest' ]]; then
-    MAGISK_VERSION=$(curl --fail -sL -I -o /dev/null -w '%{url_effective}' https://github.com/topjohnwu/Magisk/releases/latest | sed 's/.*\/tag\///;')
+    MAGISK_VERSION=$(curl --fail -sL -I -o /dev/null -w '%{url_effective}' https://github.com/pixincreate/Magisk/releases/latest | sed 's/.*\/tag\///;')
   fi
   print "Magisk version: $MAGISK_VERSION"
 
@@ -349,15 +348,14 @@ function patchOTAs() {
       # We need to add .tmp to PATH, but we can't use $PATH: because this would be the PATH of the host not the container
       # Python image is designed to run as root, so chown the files it creates back at the end
       # ... room for improvement 😐️
-      # shellcheck disable=SC2046
-      docker run --rm -i $(tty &>/dev/null && echo '-t') -v "$PWD:/app"  -w /app \
+      docker run --rm -v "$PWD:/app"  -w /app \
         -e PATH='/bin:/usr/local/bin:/sbin:/usr/bin/:/app/.tmp' \
-        --env-file <(env) \
+        -e PASSPHRASE_AVB="$PASSPHRASE_AVB" -e PASSPHRASE_OTA="$PASSPHRASE_OTA" \
         python:${PYTHON_VERSION} sh -c \
           "apk add openssh && \
            pip install -r .tmp/my-avbroot-setup/requirements.txt && \
-           python .tmp/my-avbroot-setup/patch.py ${args[*]} ; result=\$?; \
-           chown -R $(id -u):$(id -g) .tmp; exit \$result"
+           python .tmp/my-avbroot-setup/patch.py ${args[*]} && \
+           chown -R $(id -u):$(id -g) .tmp"
     
        printGreen "Finished patching file ${targetFile}"
     fi
@@ -386,16 +384,6 @@ function base642key() {
 }
 
 function releaseOta() {
-
-  createReleaseIfNecessary
-  
-  for flavor in "${!POTENTIAL_ASSETS[@]}"; do
-    local assetName="${POTENTIAL_ASSETS[$flavor]}"
-    uploadFile ".tmp/$assetName" "$assetName" "application/zip"
-  done
-}
-
-function createReleaseIfNecessary() {
   checkMandatoryVariable 'GITHUB_REPO' 'GITHUB_TOKEN'
 
   local response changelog src_repo current_commit 
@@ -448,6 +436,11 @@ function createReleaseIfNecessary() {
       exit 1
     fi
   fi
+
+  for flavor in "${!POTENTIAL_ASSETS[@]}"; do
+    local assetName="${POTENTIAL_ASSETS[$flavor]}"
+    uploadFile ".tmp/$assetName" "$assetName" "application/zip"
+  done
 }
 
 function uploadFile() {
