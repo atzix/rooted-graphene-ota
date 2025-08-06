@@ -1,7 +1,7 @@
 {
   "version": 2,
   "full": {
-    "location_ota": "https://github.com/atzix/rooted-graphene-ota/releases/download/2025073000/komodo-2025073000-cc1fdf7-magisk-canary-28103.zip",
-    "location_csig": "https://github.com/atzix/rooted-graphene-ota/releases/download/2025073000/komodo-2025073000-cc1fdf7-magisk-canary-28103.zip.csig"
+    "location_ota": "https://github.com/atzix/rooted-graphene-ota/releases/download/2025080400/komodo-2025080400-cc1fdf7-magisk-canary-28103.zip",
+    "location_csig": "https://github.com/atzix/rooted-graphene-ota/releases/download/2025080400/komodo-2025080400-cc1fdf7-magisk-canary-28103.zip.csig"
   }
 }
