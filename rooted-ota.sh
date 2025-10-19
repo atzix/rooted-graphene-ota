@@ -61,7 +61,7 @@ SKIP_MODULES=${SKIP_MODULES:-'false'}
 # Upload OTA to test folder on OTA server
 UPLOAD_TEST_OTA=${UPLOAD_TEST_OTA:-false}
 
-OTA_CHANNEL=${OTA_CHANNEL:-stable} # Alternative: 'alpha'
+OTA_CHANNEL=${OTA_CHANNEL:-stable-security-preview} # Alternative: 'stable' or 'alpha'
 NO_COLOR=${NO_COLOR:-''}
 OTA_BASE_URL="https://releases.grapheneos.org"
 
@@ -139,14 +139,14 @@ function checkBuildNecessary() {
   local currentCommit
   currentCommit=$(git rev-parse --short HEAD)
   POTENTIAL_ASSETS=()
-
-  if [[ -n "$MAGISK_PREINIT_DEVICE" ]]; then
+    
+  if [[ -n "$MAGISK_PREINIT_DEVICE" ]]; then 
     # e.g. oriole-2023121200-magisk-v26.4-4647f74-dirty.zip
     POTENTIAL_ASSETS['magisk']="${DEVICE_ID}-${OTA_VERSION}-${currentCommit}-magisk-${MAGISK_VERSION}$(createAssetSuffix).zip"
-  else
+  else 
     printGreen "MAGISK_PREINIT_DEVICE not set for device, not creating magisk OTA"
   fi
-
+  
   if [[ "$SKIP_ROOTLESS" != 'true' ]]; then
     POTENTIAL_ASSETS['rootless']="${DEVICE_ID}-${OTA_VERSION}-${currentCommit}-rootless$(createAssetSuffix).zip"
   else
@@ -176,16 +176,16 @@ function checkBuildNecessary() {
   if [[ -n ${response} ]]; then
     RELEASE_ID=$(echo "${response}" | jq -r '.id')
     print "Release ${OTA_VERSION} exists. ID=$RELEASE_ID"
-
+    
     for flavor in "${!POTENTIAL_ASSETS[@]}"; do
       local selectedAsset POTENTIAL_ASSET_NAME="${POTENTIAL_ASSETS[$flavor]}"
       print "Checking if asset exists ${POTENTIAL_ASSET_NAME}"
-
+      
       # Save some storage by not building and uploading every new commit as asset
       selectedAsset=$(echo "${response}" | jq -r --arg assetPrefix "${DEVICE_ID}-${OTA_VERSION}" \
         '.assets[] | select(.name | startswith($assetPrefix)) | .name' \
           | grep "${flavor}" || true)
-
+  
       if [[ -n "${selectedAsset}" ]] && [[ "$FORCE_BUILD" != 'true' ]] && [[ "$UPLOAD_TEST_OTA" != 'true' ]]; then
         printGreen "Skipping build of asset name '$POTENTIAL_ASSET_NAME'. Because this flavor already is released with a different commit." \
           "Set FORCE_BUILD or UPLOAD_TEST_OTA to force. Assets found on release: ${selectedAsset//$'\n'/ }"
@@ -194,7 +194,7 @@ function checkBuildNecessary() {
         print "No asset found with name '$POTENTIAL_ASSET_NAME'."
       fi
     done
-
+    
     if [ "${#POTENTIAL_ASSETS[@]}" -eq 0 ]; then
       printGreen "All potential assets already exist. Exiting"
       exit 0
@@ -219,7 +219,7 @@ function createAssetSuffix() {
   local suffix=''
   if [[ "${SKIP_MODULES}" == 'true' ]]; then
     suffix+='-minimal'
-  fi
+  fi 
   if [[ "${UPLOAD_TEST_OTA}" == 'true' ]]; then
     suffix+='-test'
   fi
@@ -348,14 +348,15 @@ function patchOTAs() {
       # We need to add .tmp to PATH, but we can't use $PATH: because this would be the PATH of the host not the container
       # Python image is designed to run as root, so chown the files it creates back at the end
       # ... room for improvement 😐️
-      docker run --rm -v "$PWD:/app"  -w /app \
+      # shellcheck disable=SC2046
+      docker run --rm -i $(tty &>/dev/null && echo '-t') -v "$PWD:/app"  -w /app \
         -e PATH='/bin:/usr/local/bin:/sbin:/usr/bin/:/app/.tmp' \
-        -e PASSPHRASE_AVB="$PASSPHRASE_AVB" -e PASSPHRASE_OTA="$PASSPHRASE_OTA" \
+        --env-file <(env) \
         python:${PYTHON_VERSION} sh -c \
           "apk add openssh && \
            pip install -r .tmp/my-avbroot-setup/requirements.txt && \
-           python .tmp/my-avbroot-setup/patch.py ${args[*]} && \
-           chown -R $(id -u):$(id -g) .tmp"
+           python .tmp/my-avbroot-setup/patch.py ${args[*]} ; result=\$?; \
+           chown -R $(id -u):$(id -g) .tmp; exit \$result"
     
        printGreen "Finished patching file ${targetFile}"
     fi
@@ -384,13 +385,26 @@ function base642key() {
 }
 
 function releaseOta() {
+
+  createReleaseIfNecessary
+  
+  for flavor in "${!POTENTIAL_ASSETS[@]}"; do
+    local assetName="${POTENTIAL_ASSETS[$flavor]}"
+    uploadFile ".tmp/$assetName" "$assetName" "application/zip"
+  done
+}
+
+function createReleaseIfNecessary() {
   checkMandatoryVariable 'GITHUB_REPO' 'GITHUB_TOKEN'
 
   local response changelog src_repo current_commit 
 
   if [[ -z "$RELEASE_ID" ]]; then
     src_repo=$(extractGithubRepo "$(git config --get remote.origin.url)")
-    
+
+    # Security-preview releases end in suffix 01,but anchor links on release page always end in 00
+    # e.g. 25092501 -> 25092500
+    OTA_VERSION_ANCHOR="${OTA_VERSION/%01/00}"
     if [[ "${GITHUB_REPO}" == "${src_repo}" ]]; then
       changelog=$(curl -sL -X POST -H "Authorization: token $GITHUB_TOKEN" \
         -d "{
@@ -399,11 +413,11 @@ function releaseOta() {
               }" \
         "https://api.github.com/repos/$GITHUB_REPO/releases/generate-notes" | jq -r '.body // empty')
       # Replace \n by \\n to keep them as chars
-      changelog="Update to [GrapheneOS ${OTA_VERSION}](https://grapheneos.org/releases#${OTA_VERSION}).\n\n$(echo "${changelog}" | sed ':a;N;$!ba;s/\n/\\n/g')"
+      changelog="Update to [GrapheneOS ${OTA_VERSION}](https://grapheneos.org/releases#${OTA_VERSION_ANCHOR}).\n\n$(echo "${changelog}" | sed ':a;N;$!ba;s/\n/\\n/g')"
     else 
       # When pushing to different repo's GH pages, generating notes does not make too much sense. Refer to the used repo's "version" instead. 
       current_commit=$(git rev-parse --short HEAD)
-      changelog="Update to [GrapheneOS ${OTA_VERSION}](https://grapheneos.org/releases#${OTA_VERSION}).\n\nRelease created using ${src_repo}@${current_commit}. See [Changelog](https://github.com/${src_repo}/blob/${current_commit}/README.md#notable-changelog)."
+      changelog="Update to [GrapheneOS ${OTA_VERSION}](https://grapheneos.org/releases#${OTA_VERSION_ANCHOR}).\n\nRelease created using ${src_repo}@${current_commit}. See [Changelog](https://github.com/${src_repo}/blob/${current_commit}/README.md#notable-changelog)."
     fi
     
     response=$(curl -sL -X POST -H "Authorization: token $GITHUB_TOKEN" \
@@ -436,11 +450,6 @@ function releaseOta() {
       exit 1
     fi
   fi
-
-  for flavor in "${!POTENTIAL_ASSETS[@]}"; do
-    local assetName="${POTENTIAL_ASSETS[$flavor]}"
-    uploadFile ".tmp/$assetName" "$assetName" "application/zip"
-  done
 }
 
 function uploadFile() {
