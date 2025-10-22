@@ -35,7 +35,7 @@ OTA_VERSION=${OTA_VERSION:-'latest'}
 # Breaking changes in magisk might need to be adapted in new avbroot version
 # Find latest magisk version here: https://github.com/pixincreate/Magisk/releases
 # renovate: datasource=github-releases packageName=pixincreate/Magisk
-DEFAULT_MAGISK_VERSION=canary-28103
+DEFAULT_MAGISK_VERSION=canary-30400
 MAGISK_VERSION=${MAGISK_VERSION:-${DEFAULT_MAGISK_VERSION}}
 
 SKIP_CLEANUP=${SKIP_CLEANUP:-''}
