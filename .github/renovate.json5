@@ -16,11 +16,6 @@
       matchUpdateTypes: ["minor", "patch" ],
       automerge: true,
     },
-    {
-      matchPackageNames: ["pixincreate/Magisk"],
-      versioning: "regex:^canary-(?<major>\\d+)$",
-      ignoreUnstable: false,
-    }
   ],
   customManagers: [
     {

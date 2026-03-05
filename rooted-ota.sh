@@ -34,8 +34,8 @@ OTA_VERSION=${OTA_VERSION:-'latest'}
 # It's recommended to pin magisk version in combination with AVB_ROOT_VERSION.
 # Breaking changes in magisk might need to be adapted in new avbroot version
 # Find latest magisk version here: https://github.com/pixincreate/Magisk/releases
-# renovate: datasource=github-releases packageName=pixincreate/Magisk
-DEFAULT_MAGISK_VERSION=canary-30600
+# renovate: datasource=github-releases packageName=pixincreate/Magisk versioning=semver-coerced
+DEFAULT_MAGISK_VERSION=v30.6
 MAGISK_VERSION=${MAGISK_VERSION:-${DEFAULT_MAGISK_VERSION}}
 
 SKIP_CLEANUP=${SKIP_CLEANUP:-''}
