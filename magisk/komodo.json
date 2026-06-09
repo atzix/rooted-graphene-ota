@@ -1,7 +1,7 @@
 {
   "version": 2,
   "full": {
-    "location_ota": "https://github.com/atzix/rooted-graphene-ota/releases/download/2026060101/komodo-2026060101-4b9cdc4-magisk-v30.7.zip",
-    "location_csig": "https://github.com/atzix/rooted-graphene-ota/releases/download/2026060101/komodo-2026060101-4b9cdc4-magisk-v30.7.zip.csig"
+    "location_ota": "https://github.com/atzix/rooted-graphene-ota/releases/download/2026060601/komodo-2026060601-4b9cdc4-magisk-v30.7.zip",
+    "location_csig": "https://github.com/atzix/rooted-graphene-ota/releases/download/2026060601/komodo-2026060601-4b9cdc4-magisk-v30.7.zip.csig"
   }
 }
