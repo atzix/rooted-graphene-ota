@@ -41,6 +41,7 @@ jobs:
           DEVICE_ID: komodo # Pixel 9 Pro XL
           MAGISK_PREINIT_DEVICE: sda10
           SKIP_PIXINCREATE: 'false'
+          SKIP_MAGISK: 'true'
           PASSPHRASE_AVB: ${{ secrets.PASSPHRASE_AVB }}
           PASSPHRASE_OTA: ${{ secrets.PASSPHRASE_OTA }}
           KEY_AVB_BASE64: ${{ secrets.KEY_AVB_BASE64 }}
