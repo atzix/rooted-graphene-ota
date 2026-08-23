@@ -34,12 +34,42 @@ jobs:
             echo "$key_value_pair" >> $GITHUB_ENV
           done
       - run: sudo apt-get install -y jq curl git
+
+      # TEMPORARY: pixincreate renamed his release asset (Magisk-vX.apk instead of app-release.apk)
+      - name: Pre-seed pixincreate magisk (asset name changed in v30.8.1)
+        run: |
+          mkdir -p .tmp
+          curl -fsSL -o .tmp/pixincreate-v30.8.1.apk \
+            "https://github.com/pixincreate/Magisk/releases/download/v30.8.1/Magisk-v30.8.1.apk"
+          curl -fsSL "https://github.com/pixincreate/Magisk/releases/download/v30.8.1/SHA256SUMS" \
+            | grep "Magisk-v30.8.1.apk" | sed 's|Magisk-v30.8.1.apk|.tmp/pixincreate-v30.8.1.apk|' | sha256sum -c
+      # TEMPORARY, avbroot 3.33.0 doesn't know Magisk versionCode 30800 (v30.8.1 pixincreate) yet,
+      # so pre-seed my-avbroot-setup with --ignore-magisk-warnings added to ota patch.
+      - name: Pre-seed my-avbroot-setup with --ignore-magisk-warnings
+        run: |
+          PATCH_PY_COMMIT=$(grep -oP '^PATCH_PY_COMMIT=\K\w+' rooted-ota.sh)
+          git clone https://github.com/chenxiaolong/my-avbroot-setup .tmp/my-avbroot-setup
+          git -C .tmp/my-avbroot-setup checkout "$PATCH_PY_COMMIT"
+          python3 - <<'EOF'
+          from pathlib import Path
+          p = Path('.tmp/my-avbroot-setup/lib/external.py')
+          s = p.read_text()
+          anchor = "        *extra_args,\n    ]\n"
+          assert s.count(anchor) == 1, "external.py changed; update this patch"
+          s = s.replace(anchor, anchor +
+              "\n    if '--magisk' in cmd:\n"
+              "        cmd.append('--ignore-magisk-warnings')\n")
+          p.write_text(s)
+          print("patched external.py")
+          EOF
+
       - name: release
         env:
           DEVICE_ID: komodo # Pixel 9 Pro XL
           MAGISK_PREINIT_DEVICE: sda10
           SKIP_PIXINCREATE: 'false'
           SKIP_MAGISK: 'true'
+          MAGISK_VERSION: 'v30.8.1'
           PASSPHRASE_AVB: ${{ secrets.PASSPHRASE_AVB }}
           PASSPHRASE_OTA: ${{ secrets.PASSPHRASE_OTA }}
           KEY_AVB_BASE64: ${{ secrets.KEY_AVB_BASE64 }}
