@@ -40,6 +40,7 @@ jobs:
           MAGISK_PREINIT_DEVICE: sda10
           SKIP_PIXINCREATE: 'false'
           SKIP_MAGISK: 'true'
+          PIXINCREATE_VERSION: 'v31.1'
           PASSPHRASE_AVB: ${{ secrets.PASSPHRASE_AVB }}
           PASSPHRASE_OTA: ${{ secrets.PASSPHRASE_OTA }}
           KEY_AVB_BASE64: ${{ secrets.KEY_AVB_BASE64 }}
